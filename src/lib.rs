@@ -18,6 +18,10 @@ pub use farc::{Farc, FarcError};
 mod pgdb;
 pub use pgdb::{Pgdb, PgdbError};
 
+mod dehasher;
+pub use dehasher::FileHashType;
+pub use dehasher::message_dehash;
+
 // unused function to find hashed file name
 /*
 mod find_name;
