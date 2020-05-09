@@ -31,10 +31,18 @@ pub mod message_dehash {
     use std::io::{Read, Seek};
     use std::io;
 
+    /// get the file name of the list file that should be openened
+    ///
+    /// # Example
+    /// ```
+    /// use pmd_farc::message_dehash::get_file_name;
+    /// assert_eq!(&get_file_name("message.bin").unwrap(), Some("message.lst").unwrap());
+    /// ```
     pub fn get_file_name(original_file_name: &str) -> Option<String> {
         Some(original_file_name.split(".").next()?.to_string() + ".lst")
     }
 
+    /// Try to find the name of file in a farc with the adapted list file
     pub fn try_possible_name<F: Read, FT: Read + Seek>(farc: &mut Farc<FT>, list_file: &mut F) -> Result<(), io::Error> {
         let mut strings = String::new();
         list_file.read_to_string(&mut strings)?;
