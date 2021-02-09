@@ -2,13 +2,13 @@ use crc::crc32;
 use io_partition::PartitionMutex;
 use pmd_sir0::{Sir0, Sir0Error};
 use std::collections::HashMap;
+use std::error::Error;
+use std::fmt;
+use std::fmt::Display;
 use std::io;
 use std::io::{Read, Seek, SeekFrom};
-use std::sync::{Arc, Mutex};
 use std::string::FromUtf16Error;
-use std::fmt::Display;
-use std::fmt;
-use std::error::Error;
+use std::sync::{Arc, Mutex};
 
 /// An error that ``Farc`` can return
 #[derive(Debug)]
@@ -39,7 +39,11 @@ impl Error for FarcError {
             Self::IOerror(err) | Self::PartitionCreationError(err) => Some(err),
             Self::CreateSir0Error(err) => Some(err),
             Self::FromUtf16Error(err) => Some(err),
-            Self::InvalidType(_) | Self::UnsuportedFat5Type(_) | Self::Poisoned | Self::NamedFileNotFound(_) | Self::HashedFileNotFound(_) => None,
+            Self::InvalidType(_)
+            | Self::UnsuportedFat5Type(_)
+            | Self::Poisoned
+            | Self::NamedFileNotFound(_)
+            | Self::HashedFileNotFound(_) => None,
         }
     }
 }
@@ -48,14 +52,29 @@ impl Display for FarcError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::IOerror(_) => write!(f, "An error occured while performing an IO operation"),
-            Self::InvalidType(id) => write!(f, "The type of the file is not reconized: found type {}", id),
-            Self::PartitionCreationError(_) => write!(f, "An error happened while creating a partition of the file"),
+            Self::InvalidType(id) => write!(
+                f,
+                "The type of the file is not reconized: found type {}",
+                id
+            ),
+            Self::PartitionCreationError(_) => write!(
+                f,
+                "An error happened while creating a partition of the file"
+            ),
             Self::CreateSir0Error(_) => write!(f, "An error happened while creating a Sir0 file"),
-            Self::UnsuportedFat5Type(id) => write!(f, "The fat5 type is not supported: found {}", id),
+            Self::UnsuportedFat5Type(id) => {
+                write!(f, "The fat5 type is not supported: found {}", id)
+            }
             Self::Poisoned => write!(f, "The mutex guarding the access to the file is poisoned"),
-            Self::NamedFileNotFound(name) => write!(f, "The file with name \"{}\" does not exist", name),
-            Self::HashedFileNotFound(hash) => write!(f, "The file with the hash \"{}\" does not exist", hash),
-            Self::FromUtf16Error(_) => write!(f, "An error happened while parsing an utf-16 string"),
+            Self::NamedFileNotFound(name) => {
+                write!(f, "The file with name \"{}\" does not exist", name)
+            }
+            Self::HashedFileNotFound(hash) => {
+                write!(f, "The file with the hash \"{}\" does not exist", hash)
+            }
+            Self::FromUtf16Error(_) => {
+                write!(f, "An error happened while parsing an utf-16 string")
+            }
         }
     }
 }
@@ -83,7 +102,6 @@ fn read_u16_le<T: Read>(file: &mut T) -> Result<u16, FarcError> {
     file.read_exact(&mut buffer)?;
     Ok(u16::from_le_bytes(buffer))
 }
-
 
 fn read_null_terminated_utf16_string<T: Read>(file: &mut T) -> Result<String, FarcError> {
     let mut buffer: Vec<u16> = Vec::new();
@@ -144,12 +162,12 @@ impl FileNameIndex {
             trace!("found a corresponding hash: {} <-> {}", hash, name);
             let file_id = self.name_crc32.remove(&hash).unwrap(); //should always work
             if self.name_string.insert(name.to_string(), file_id).is_some() {
-                panic!("hash mismach !!! Prove you shouldn't use crc32...");
+                panic!("hash mismach !!! Maybe try to rename the file {:?}", name);
             };
             true
         } else {
             if log_enabled!(log::Level::Trace) && !self.name_string.contains_key(name) {
-                    trace!("hash not found in the file name: {} for {}", hash, name);
+                trace!("hash not found in the file name: {} for {}", hash, name);
             }
             false
         }
@@ -159,11 +177,15 @@ impl FileNameIndex {
         self.file_data
             .get(match self.name_string.get(name) {
                 Some(value) => *value,
-                None => match self.name_crc32.get(&crc32::checksum_ieee(&string_to_utf16(name))) {
-                        Some(value) => *value,
-                        None => return None,
-                    }
-            }).cloned()
+                None => match self
+                    .name_crc32
+                    .get(&crc32::checksum_ieee(&string_to_utf16(name)))
+                {
+                    Some(value) => *value,
+                    None => return None,
+                },
+            })
+            .cloned()
     }
 
     fn get_unnamed_file_data(&self, hash: u32) -> Option<FarcFile> {
@@ -171,7 +193,8 @@ impl FileNameIndex {
             .get(match self.name_crc32.get(&hash) {
                 Some(value) => *value,
                 None => return None,
-            }).cloned()
+            })
+            .cloned()
     }
 }
 
@@ -206,12 +229,9 @@ impl<F: Read + Seek> Farc<F> {
             all_data_offset = read_u32_le(&mut *file)?;
         }
 
-        let sir0_partition = io_partition::PartitionMutex::new(
-            file.clone(),
-            sir0_offset as u64,
-            sir0_lenght as u64,
-        )
-        .map_err(FarcError::PartitionCreationError)?;
+        let sir0_partition =
+            io_partition::PartitionMutex::new(file.clone(), sir0_offset as u64, sir0_lenght as u64)
+                .map_err(FarcError::PartitionCreationError)?;
         let mut sir0 = Sir0::new(sir0_partition).map_err(FarcError::CreateSir0Error)?;
 
         let h = sir0.get_header();
@@ -227,25 +247,19 @@ impl<F: Read + Seek> Farc<F> {
 
         let mut index = FileNameIndex::default();
         let mut sir0_file = sir0.get_file();
-        for file_index in 0..(file_count - 1) {
-            sir0_file.seek(
-                SeekFrom::Start(sir0_data_offset as u64 + (file_index * entry_lenght) as u64),
-            )?;
+        for file_index in 0..(file_count) {
+            sir0_file.seek(SeekFrom::Start(
+                sir0_data_offset as u64 + (file_index * entry_lenght) as u64,
+            ))?;
             let filename_offset_or_hash = read_u32_le(&mut sir0_file)?;
             let data_offset = read_u32_le(&mut sir0_file)?;
             let data_length = read_u32_le(&mut sir0_file)?;
 
             match sir0_fat5_type {
                 0 => {
-                    sir0_file.seek(
-                        SeekFrom::Start(filename_offset_or_hash as u64),
-                    )?;
+                    sir0_file.seek(SeekFrom::Start(filename_offset_or_hash as u64))?;
                     let name = read_null_terminated_utf16_string(&mut sir0_file)?;
-                    index.add_file_with_name(
-                        name,
-                        all_data_offset + data_offset,
-                        data_length
-                    );
+                    index.add_file_with_name(name, all_data_offset + data_offset, data_length);
                 }
                 1 => index.add_file_with_hash(
                     filename_offset_or_hash,
@@ -256,10 +270,7 @@ impl<F: Read + Seek> Farc<F> {
             };
         }
 
-        Ok(Self {
-            file,
-            index,
-        })
+        Ok(Self { file, index })
     }
 
     /// return the number of file contained in this ``Farc`` file
