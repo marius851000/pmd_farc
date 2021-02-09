@@ -22,6 +22,13 @@ mod dehasher;
 pub use dehasher::message_dehash;
 pub use dehasher::FileHashType;
 
+
+mod file_name_index;
+use file_name_index::FileNameIndex;
+
+mod farc_file;
+use farc_file::FarcFile;
+
 // unused function to find hashed file name
 /*
 mod find_name;
