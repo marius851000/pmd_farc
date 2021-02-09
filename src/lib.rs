@@ -19,8 +19,8 @@ mod pgdb;
 pub use pgdb::{Pgdb, PgdbError};
 
 mod dehasher;
-pub use dehasher::FileHashType;
 pub use dehasher::message_dehash;
+pub use dehasher::FileHashType;
 
 // unused function to find hashed file name
 /*
