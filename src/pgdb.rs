@@ -1,10 +1,10 @@
 use io_partition::clone_into_vec;
+use std::error::Error;
+use std::fmt;
+use std::fmt::Display;
 use std::io;
 use std::io::{Read, Seek, SeekFrom};
 use std::string::FromUtf16Error;
-use std::error::Error;
-use std::fmt::Display;
-use std::fmt;
 
 #[derive(Debug)]
 /// Any error that can be retourned by ``Pgdb``
@@ -19,7 +19,7 @@ impl Error for PgdbError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::IOError(err) => Some(err),
-            Self::FromUtf16Error(err) => Some(err)
+            Self::FromUtf16Error(err) => Some(err),
         }
     }
 }
@@ -28,7 +28,9 @@ impl Display for PgdbError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::IOError(_) => write!(f, "An error happened while performing an IO"),
-            Self::FromUtf16Error(_) => write!(f, "An error happened while parsing an utf-16 String"),
+            Self::FromUtf16Error(_) => {
+                write!(f, "An error happened while parsing an utf-16 String")
+            }
         }
     }
 }
@@ -81,22 +83,22 @@ fn pgdb_read_utf16_at_offset<T: Read + Seek>(
 
 #[derive(Debug)]
 /// An entrie of a Pgdb file.
-pub struct PGDBEntrie {
+pub struct PGDBEntry {
     pub primary_bgrs_filename: String,
     pub secondary_bgrs_filename: String,
     pub actor_name: String,
     pub data: Vec<u8>,
 }
 
-impl PGDBEntrie {
-    /// Create a new ``PGDBEntrie`` with the input value
+impl PGDBEntry {
+    /// Create a new ``PGDBEntry`` with the input value
     pub fn new(
         actor_name: String,
         primary_bgrs_filename: String,
         secondary_bgrs_filename: String,
         data: Vec<u8>,
     ) -> Self {
-        PGDBEntrie {
+        PGDBEntry {
             actor_name,
             primary_bgrs_filename,
             secondary_bgrs_filename,
@@ -107,7 +109,7 @@ impl PGDBEntrie {
 
 /// A parser for the Pgdb file format. See the crate root for more information
 pub struct Pgdb {
-    entries: Vec<PGDBEntrie>,
+    entries: Vec<PGDBEntry>,
 }
 
 impl Pgdb {
@@ -153,7 +155,7 @@ impl Pgdb {
             let actor_name =
                 pgdb_read_utf16_at_offset(&mut file, SeekFrom::Start(actor_name_pointer as u64))?;
 
-            entries.push(PGDBEntrie::new(
+            entries.push(PGDBEntry::new(
                 actor_name,
                 primary_bgrs_filename,
                 secondary_bgrs_filename,
@@ -164,8 +166,8 @@ impl Pgdb {
         Ok(Self { entries })
     }
 
-    /// return the list of ``PGDBEntrie`` contained in this ``PGDB``
-    pub fn get_entries(&self) -> &Vec<PGDBEntrie> {
+    /// return the list of ``PGDBEntry`` contained in this ``PGDB``
+    pub fn get_entries(&self) -> &Vec<PGDBEntry> {
         &self.entries
     }
 }
