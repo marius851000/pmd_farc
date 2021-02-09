@@ -9,6 +9,7 @@ use std::io;
 use std::io::{Read, Seek, SeekFrom};
 use std::string::FromUtf16Error;
 use std::sync::{Arc, Mutex};
+//TODO: rewrite using binread
 
 /// An error that ``Farc`` can return
 #[derive(Debug)]
