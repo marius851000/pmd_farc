@@ -1,4 +1,4 @@
-use crate::{FarcFile, FileNameIndex};
+use crate::{FarcFile, FileNameError, FileNameIndex};
 use binread::{derive_binread, BinReaderExt};
 use byteorder::{ReadBytesExt, LE};
 use io_partition::PartitionMutex;
@@ -8,6 +8,7 @@ use std::io::{Read, Seek, SeekFrom};
 use std::string::FromUtf16Error;
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
+
 /// An error that ``Farc`` can return
 #[derive(Debug, Error)]
 pub enum FarcError {
@@ -38,6 +39,15 @@ pub enum FarcError {
     /// An error caused by parsing the header of the file
     #[error("An error happened while parsing the header of the file")]
     ReadHeaderError(#[source] binread::Error),
+    /// The sir0 header isn't long enought
+    #[error("The sir0 header isn't long enought. It should be (at least) 12 bytes, but it only have {0} bytes")]
+    Sir0HeaderNotLongEnought(usize),
+    /// a contained file overflow
+    #[error("A contained file is position overflow a u32 integer ({0}+{1})")]
+    DataStartOverflow(u32, u32),
+    /// a conflict between two file entry
+    #[error("A conflict between two file happened")]
+    FileNameError(#[from] FileNameError),
 }
 
 fn read_null_terminated_utf16_string<T: Read>(file: &mut T) -> Result<String, FarcError> {
@@ -94,6 +104,9 @@ impl<F: Read + Seek> Farc<F> {
         let mut sir0 = Sir0::new(sir0_partition).map_err(FarcError::CreateSir0Error)?;
 
         let h = sir0.get_header();
+        if h.len() < 12 {
+            return Err(FarcError::Sir0HeaderNotLongEnought(h.len()));
+        };
         let sir0_data_offset = u32::from_le_bytes([h[0], h[1], h[2], h[3]]);
         let file_count = u32::from_le_bytes([h[4], h[5], h[6], h[7]]);
         let sir0_fat5_type = u32::from_le_bytes([h[8], h[9], h[10], h[11]]);
@@ -114,21 +127,26 @@ impl<F: Read + Seek> Farc<F> {
             let data_offset = sir0_file.read_u32::<LE>()?;
             let data_length = sir0_file.read_u32::<LE>()?;
 
+            let data_start = farc_header
+                .all_data_offset
+                .checked_add(data_offset)
+                .map_or_else(
+                    || {
+                        Err(FarcError::DataStartOverflow(
+                            farc_header.all_data_offset,
+                            data_offset,
+                        ))
+                    },
+                    Ok,
+                )?;
+
             match sir0_fat5_type {
                 0 => {
                     sir0_file.seek(SeekFrom::Start(filename_offset_or_hash as u64))?;
                     let name = read_null_terminated_utf16_string(&mut sir0_file)?;
-                    index.add_file_with_name(
-                        name,
-                        farc_header.all_data_offset + data_offset,
-                        data_length,
-                    );
+                    index.add_file_with_name(name, data_start, data_length)?;
                 }
-                1 => index.add_file_with_hash(
-                    filename_offset_or_hash,
-                    farc_header.all_data_offset + data_offset,
-                    data_length,
-                ),
+                1 => index.add_file_with_hash(filename_offset_or_hash, data_start, data_length)?,
                 x => return Err(FarcError::UnsuportedFat5Type(x)),
             };
         }
@@ -138,51 +156,57 @@ impl<F: Read + Seek> Farc<F> {
 
     /// return the number of file contained in this ``Farc`` file
     pub fn file_count(&self) -> usize {
-        self.file_count_hashed() + self.file_count_named()
+        self.index.len()
     }
 
     /// return the number of file with an unknown name in this ``Farc`` file
-    pub fn file_count_hashed(&self) -> usize {
-        self.index.name_crc32.len()
+    pub fn file_unknown_name(&self) -> usize {
+        self.index.iter().filter(|f| f.name.is_none()).count()
     }
 
     /// return the number of file with a known name in this ``Farc`` file
-    pub fn file_count_named(&self) -> usize {
-        self.index.name_string.len()
+    pub fn file_known_name(&self) -> usize {
+        self.index.iter().filter(|f| f.name.is_some()).count()
     }
 
     /// iter over the known name of file
-    pub fn iter_name(&self) -> std::vec::IntoIter<&String> {
-        self.index
-            .name_string
-            .iter()
-            .map(|x| x.0)
-            .collect::<Vec<_>>()
-            .into_iter()
+    pub fn iter_name(&self) -> impl Iterator<Item = &String> {
+        self.index.iter().filter_map(|e| e.name.as_ref())
     }
 
     /// iter over all the hash without an occording known name
-    pub fn iter_hash(&self) -> std::vec::IntoIter<u32> {
-        self.index
-            .name_crc32
-            .iter()
-            .map(|x| *x.0)
-            .collect::<Vec<_>>()
-            .into_iter()
+    pub fn iter_hash_unknown_name(&self) -> impl Iterator<Item = &u32> {
+        self.index.iter().filter_map(|e| {
+            if e.name.is_some() {
+                None
+            } else {
+                Some(&e.crc32)
+            }
+        })
+    }
+
+    /// iterate over all the known file, with their hash and (optionaly) their name.
+    pub fn iter(&self) -> impl Iterator<Item = (u32, Option<&String>)> {
+        self.index.iter().map(|f| (f.crc32, f.name.as_ref()))
+    }
+
+    /// Iter over all the hash
+    pub fn iter_all_hash(&self) -> impl Iterator<Item = &u32> {
+        self.index.iter().map(|e| &e.crc32)
     }
 
     /// Return an handle to a file stored in this ``Farc``, from it's name. It will hash the name as necessary.
     pub fn get_named_file(&self, name: &str) -> Result<PartitionMutex<F>, FarcError> {
-        let file_data = match self.index.get_named_file_data(name) {
+        let file_data = match self.index.get_file_by_name(name) {
             Some(value) => value,
             None => return Err(FarcError::NamedFileNotFound(name.to_string())),
         };
         self.create_partition_from_data(file_data)
     }
 
-    /// Return an handle to a file with an unknown name. It won't search for file a known name, as opposed to ``get_named_file``
-    pub fn get_unnamed_file(&self, hash: u32) -> Result<PartitionMutex<F>, FarcError> {
-        let file_data = match self.index.get_unnamed_file_data(hash) {
+    /// Return an handle to a file, whether its name is known or not.
+    pub fn get_hashed_file(&self, hash: u32) -> Result<PartitionMutex<F>, FarcError> {
+        let file_data = match self.index.get_file_by_hash(hash) {
             Some(value) => value,
             None => return Err(FarcError::HashedFileNotFound(hash)),
         };
@@ -191,7 +215,7 @@ impl<F: Read + Seek> Farc<F> {
 
     fn create_partition_from_data(
         &self,
-        file_data: FarcFile,
+        file_data: &FarcFile,
     ) -> Result<PartitionMutex<F>, FarcError> {
         PartitionMutex::new(
             self.file.clone(),

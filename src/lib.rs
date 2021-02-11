@@ -24,10 +24,10 @@ pub use dehasher::FileHashType;
 
 
 mod file_name_index;
-use file_name_index::FileNameIndex;
+pub use file_name_index::{hash_name, FileNameError, FileNameIndex};
 
 mod farc_file;
-use farc_file::FarcFile;
+pub use farc_file::FarcFile;
 
 // unused function to find hashed file name
 /*
