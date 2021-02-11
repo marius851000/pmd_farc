@@ -12,8 +12,8 @@ license = "CC0-1.0"
 
 [dependencies]
 log = "0.4.8"
-io_partition = "1.0.0"
-pmd_sir0 = "1.1.1"
+io_partition = "1.1.1"
+pmd_sir0 = "1.2.1"
 #pmd_bgrs = { path = "../../pmd_bgrs" }
 #pmd_bch = { path = "../../pmd_bch" }
 crc = "1.8.1"
