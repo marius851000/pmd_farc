@@ -180,19 +180,19 @@ impl<F: Read + Seek> Farc<F> {
             if e.name.is_some() {
                 None
             } else {
-                Some(&e.crc32)
+                Some(&e.name_hash)
             }
         })
     }
 
     /// iterate over all the known file, with their hash and (optionaly) their name.
     pub fn iter(&self) -> impl Iterator<Item = (u32, Option<&String>)> {
-        self.index.iter().map(|f| (f.crc32, f.name.as_ref()))
+        self.index.iter().map(|f| (f.name_hash, f.name.as_ref()))
     }
 
     /// Iter over all the hash
     pub fn iter_all_hash(&self) -> impl Iterator<Item = &u32> {
-        self.index.iter().map(|e| &e.crc32)
+        self.index.iter().map(|e| &e.name_hash)
     }
 
     /// Return an handle to a file stored in this ``Farc``, from it's name. It will hash the name as necessary.

@@ -11,24 +11,31 @@ fn string_to_utf16(to_transform: &str) -> Vec<u8> {
         .collect()
 }
 
+/// Hash a name, first transforming it into utf16, then applying the ieee crc32 checksum
 pub fn hash_name(name: &str) -> u32 {
     let name_encoded_utf16 = string_to_utf16(name);
     crc32::checksum_ieee(&name_encoded_utf16)
 }
 
 #[derive(Error, Debug)]
+/// Any error that may happend due to name conflict
 pub enum FileNameError {
+    /// two file with the same hash
     #[error("there is already a file with the hash {0} in the farc file.")]
     HashAlreadyPresent(u32),
+    /// two file with the same hash, with one known name
     #[error("there is already a file with the hash {0} in the farc file. (one is from the file {1:?}. Maybe you should rename it)")]
     HashAlreadyPresentOne(u32, String),
+    /// two file with the same hash, with both name known
     #[error("there is already a file with the hash {0} in the farc file. (one is from the file {1:?}, the second is from {2:?}. Maybe rename one of them)")]
     HashAlreadyPresentTwo(u32, String, String),
+    /// two file with the same name
     #[error("there is already a file named {0:?} in the farc file.")]
     NameAlreadyPresent(String),
 }
 
 #[derive(Debug, Default)]
+/// Represent an index of a FARC file. Each subfile have a known position and lenght related to it's parent file, as well as the hash of the name. The full name may or may not be known for a file.
 pub struct FileNameIndex {
     file_data: Vec<FarcFile>,
     file_id_by_crc32: HashMap<u32, usize>,
@@ -74,23 +81,23 @@ impl FileNameIndex {
             };
         };
 
-        if let Some(old_id_by_hash) = self.file_id_by_crc32.insert(farc_file.crc32, new_farc_id) {
+        if let Some(old_id_by_hash) = self.file_id_by_crc32.insert(farc_file.name_hash, new_farc_id) {
             self.file_id_by_crc32
-                .insert(farc_file.crc32, old_id_by_hash);
+                .insert(farc_file.name_hash, old_id_by_hash);
             if let Some(farc_name) = &farc_file.name {
                 self.file_id_by_string.remove(farc_name);
             };
             return Err(if let Some(name_first) = farc_file.name.clone() {
                 if let Some(name_second) = self.file_data[old_id_by_hash].name.clone() {
-                    FileNameError::HashAlreadyPresentTwo(farc_file.crc32, name_first, name_second)
+                    FileNameError::HashAlreadyPresentTwo(farc_file.name_hash, name_first, name_second)
                 } else {
-                    FileNameError::HashAlreadyPresentOne(farc_file.crc32, name_first)
+                    FileNameError::HashAlreadyPresentOne(farc_file.name_hash, name_first)
                 }
             } else {
                 if let Some(name_second) = self.file_data[old_id_by_hash].name.clone() {
-                    FileNameError::HashAlreadyPresentOne(farc_file.crc32, name_second)
+                    FileNameError::HashAlreadyPresentOne(farc_file.name_hash, name_second)
                 } else {
-                    FileNameError::HashAlreadyPresent(farc_file.crc32)
+                    FileNameError::HashAlreadyPresent(farc_file.name_hash)
                 }
             });
         }
