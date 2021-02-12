@@ -11,7 +11,7 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.3"
-io_partition = "1.2.1"
+io_partition = "1.1.1"
 
 [dependencies.pmd_farc]
 path = ".."
