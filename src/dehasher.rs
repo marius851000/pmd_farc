@@ -17,6 +17,7 @@ impl FileHashType {
     /// assert_eq!(FileHashType::predict_from_file_name("message.bin"), Some(FileHashType::Message));
     /// assert_eq!(FileHashType::predict_from_file_name("unknown.bin"), None);
     /// ```
+    #[must_use]
     pub fn predict_from_file_name(file_name: &str) -> Option<FileHashType> {
         match file_name {
             "message.bin"

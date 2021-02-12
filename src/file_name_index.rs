@@ -81,7 +81,10 @@ impl FileNameIndex {
             };
         };
 
-        if let Some(old_id_by_hash) = self.file_id_by_crc32.insert(farc_file.name_hash, new_farc_id) {
+        if let Some(old_id_by_hash) = self
+            .file_id_by_crc32
+            .insert(farc_file.name_hash, new_farc_id)
+        {
             self.file_id_by_crc32
                 .insert(farc_file.name_hash, old_id_by_hash);
             if let Some(farc_name) = &farc_file.name {
@@ -89,7 +92,11 @@ impl FileNameIndex {
             };
             return Err(if let Some(name_first) = farc_file.name.clone() {
                 if let Some(name_second) = self.file_data[old_id_by_hash].name.clone() {
-                    FileNameError::HashAlreadyPresentTwo(farc_file.name_hash, name_first, name_second)
+                    FileNameError::HashAlreadyPresentTwo(
+                        farc_file.name_hash,
+                        name_first,
+                        name_second,
+                    )
                 } else {
                     FileNameError::HashAlreadyPresentOne(farc_file.name_hash, name_first)
                 }

@@ -1,6 +1,6 @@
 [package]
 name = "pmd_farc"
-version = "0.2.0"
+version = "1.0.0"
 authors = ["marius851000 <mariusdavid@laposte.net>"]
 edition = "2018"
 description = "a library permitting to read FARC file, used in pokemon mystery dungeon on 3DS"
@@ -18,3 +18,4 @@ crc = "1.8.1"
 binread = "1.4.1"
 thiserror = "1.0.23"
 byteorder = "1.4.2"
+binwrite = "0.2.1"

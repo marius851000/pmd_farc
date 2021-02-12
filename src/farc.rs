@@ -1,10 +1,9 @@
 use crate::{FarcFile, FileNameError, FileNameIndex};
-use binread::{derive_binread, BinReaderExt};
+use binread::{BinRead, BinReaderExt};
 use byteorder::{ReadBytesExt, LE};
 use io_partition::PartitionMutex;
 use pmd_sir0::{Sir0, Sir0Error};
-use std::io;
-use std::io::{Read, Seek, SeekFrom};
+use std::io::{self, Read, Seek, SeekFrom};
 use std::string::FromUtf16Error;
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
@@ -62,7 +61,7 @@ fn read_null_terminated_utf16_string<T: Read>(file: &mut T) -> Result<String, Fa
     Ok(String::from_utf16(&buffer)?)
 }
 
-#[derive_binread]
+#[derive(BinRead)]
 #[br(little)]
 enum Sir0Type {
     #[br(magic = 4u32)]
@@ -71,7 +70,7 @@ enum Sir0Type {
     Type5,
 }
 
-#[derive_binread]
+#[derive(BinRead)]
 #[br(magic = b"FARC", little)]
 struct FarcHeader {
     _unk_1: [u8; 0x1C],
@@ -79,7 +78,7 @@ struct FarcHeader {
     sir0_offset: u32,
     sir0_lenght: u32,
     all_data_offset: u32,
-    _unk_2: u32,
+    _lenght_of_all_data: u32,
 }
 
 #[derive(Debug)]
@@ -102,7 +101,6 @@ impl<F: Read + Seek> Farc<F> {
         )
         .map_err(FarcError::PartitionCreationError)?;
         let mut sir0 = Sir0::new(sir0_partition).map_err(FarcError::CreateSir0Error)?;
-
         let h = sir0.get_header();
         if h.len() < 12 {
             return Err(FarcError::Sir0HeaderNotLongEnought(h.len()));

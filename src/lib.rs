@@ -1,4 +1,6 @@
 #![warn(missing_docs)]
+#![warn(clippy::pedantic)]
+#![warn(clippy::nursery)]
 //! This library permit to have a read-only access to Farc file format used in the 3ds game of pokemon mystery dungeon.
 //!
 //! The ``pmd_farc::Farc`` file format is a packed file format, like tar. It doesn't have a notion of subdirectory. There is two type of ``pmd_farc::Farc`` file:
@@ -16,6 +18,8 @@ mod dehasher;
 pub use dehasher::message_dehash;
 pub use dehasher::FileHashType;
 
+mod farc_writer;
+pub use farc_writer::{FarcWriter, FarcWriterError};
 
 mod file_name_index;
 pub use file_name_index::{hash_name, FileNameError, FileNameIndex};
