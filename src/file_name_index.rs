@@ -6,12 +6,12 @@ use thiserror::Error;
 fn string_to_utf16(to_transform: &str) -> Vec<u8> {
     to_transform
         .encode_utf16()
-        .map(|chara| chara.to_le_bytes().to_vec())
-        .flatten()
+        .flat_map(|chara| chara.to_le_bytes().to_vec())
         .collect()
 }
 
 /// Hash a name, first transforming it into utf16, then applying the ieee crc32 checksum
+#[must_use]
 pub fn hash_name(name: &str) -> u32 {
     let name_encoded_utf16 = string_to_utf16(name);
     crc32::checksum_ieee(&name_encoded_utf16)
@@ -100,12 +100,10 @@ impl FileNameIndex {
                 } else {
                     FileNameError::HashAlreadyPresentOne(farc_file.name_hash, name_first)
                 }
+            } else if let Some(name_second) = self.file_data[old_id_by_hash].name.clone() {
+                FileNameError::HashAlreadyPresentOne(farc_file.name_hash, name_second)
             } else {
-                if let Some(name_second) = self.file_data[old_id_by_hash].name.clone() {
-                    FileNameError::HashAlreadyPresentOne(farc_file.name_hash, name_second)
-                } else {
-                    FileNameError::HashAlreadyPresent(farc_file.name_hash)
-                }
+                FileNameError::HashAlreadyPresent(farc_file.name_hash)
             });
         }
 
@@ -135,11 +133,13 @@ impl FileNameIndex {
 
     /// Return the file with the given name (the hash of the name is also tested, but not saved).
     /// If there is a conflict with the hash value, None is returned.
+    #[must_use]
     pub fn get_file_by_name(&self, name: &str) -> Option<&FarcFile> {
         if let Some(direct) = self.file_id_by_string.get(name) {
             Some(&self.file_data[*direct])
         } else {
             let hash = hash_name(name);
+            #[allow(clippy::option_if_let_else)]
             if let Some(file_id) = self.file_id_by_crc32.get(&hash) {
                 let file = &self.file_data[*file_id];
                 if file.name.is_some() {
@@ -154,17 +154,23 @@ impl FileNameIndex {
     }
 
     /// Return the file with the conresponding file name hash.
+    #[must_use]
     pub fn get_file_by_hash(&self, hash: u32) -> Option<&FarcFile> {
-        if let Some(id) = self.file_id_by_crc32.get(&hash) {
-            Some(&self.file_data[*id])
-        } else {
-            None
-        }
+        self.file_id_by_crc32
+            .get(&hash)
+            .map(|id| &self.file_data[*id])
     }
 
     /// return the total number of registered file in this index.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.file_data.len()
+    }
+
+    /// return true is the this farc archive don't have any file
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.file_data.is_empty()
     }
 
     /// iterate over all the file entry, sorted by addition order.

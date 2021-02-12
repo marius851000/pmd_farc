@@ -18,7 +18,7 @@ impl FileHashType {
     /// assert_eq!(FileHashType::predict_from_file_name("unknown.bin"), None);
     /// ```
     #[must_use]
-    pub fn predict_from_file_name(file_name: &str) -> Option<FileHashType> {
+    pub fn predict_from_file_name(file_name: &str) -> Option<Self> {
         match file_name {
             "message.bin"
             | "message_en.bin"
@@ -33,7 +33,7 @@ impl FileHashType {
             | "message_debug_ge.bin"
             | "message_debug_it.bin"
             | "message_debug_sp.bin"
-            | "message_debug_us.bin" => Some(FileHashType::Message),
+            | "message_debug_us.bin" => Some(Self::Message),
             _ => None,
         }
     }
@@ -52,8 +52,9 @@ pub mod message_dehash {
     /// use pmd_farc::message_dehash::get_file_name;
     /// assert_eq!(&get_file_name("message.bin").unwrap(), Some("message.lst").unwrap());
     /// ```
+    #[must_use]
     pub fn get_file_name(original_file_name: &str) -> Option<String> {
-        Some(original_file_name.split(".").next()?.to_string() + ".lst")
+        Some(original_file_name.split('.').next()?.to_string() + ".lst")
     }
 
     /// Try to find the name of files in a farc based on a an input file file, that contain lines of path
@@ -67,20 +68,17 @@ pub mod message_dehash {
         let mut strings = String::new();
         list_file.read_to_string(&mut strings)?;
 
-        for line in strings.split("\n") {
-            if line == "" {
+        for line in strings.split('\n') {
+            if line.is_empty() {
                 continue;
             };
-            match line.split("/").last() {
-                Some(line) => {
-                    if !farc.check_file_name(line) {
-                        debug!(
-                            "the file name {} can't be found in a message farc archive",
-                            line
-                        );
-                    };
-                }
-                None => (),
+            if let Some(file_name) = line.split('/').last() {
+                if !farc.check_file_name(file_name) {
+                    debug!(
+                        "the file name {} can't be found in a message farc archive",
+                        file_name
+                    );
+                };
             };
         }
         Ok(())

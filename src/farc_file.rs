@@ -13,7 +13,8 @@ pub struct FarcFile {
 
 impl FarcFile {
     /// Create a new [`FarcFile`] with the given parameter
-    pub fn new(start: u32, length: u32, name_hash: u32, name: Option<String>) -> Self {
+    #[must_use]
+    pub const fn new(start: u32, length: u32, name_hash: u32, name: Option<String>) -> Self {
         Self {
             start,
             length,

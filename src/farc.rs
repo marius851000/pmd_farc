@@ -96,8 +96,8 @@ impl<F: Read + Seek> Farc<F> {
 
         let sir0_partition = PartitionMutex::new(
             file.clone(),
-            farc_header.sir0_offset as u64,
-            farc_header.sir0_lenght as u64,
+            u64::from(farc_header.sir0_offset),
+            u64::from(farc_header.sir0_lenght),
         )
         .map_err(FarcError::PartitionCreationError)?;
         let mut sir0 = Sir0::new(sir0_partition).map_err(FarcError::CreateSir0Error)?;
@@ -119,7 +119,7 @@ impl<F: Read + Seek> Farc<F> {
         let mut sir0_file = sir0.get_file();
         for file_index in 0..(file_count) {
             sir0_file.seek(SeekFrom::Start(
-                sir0_data_offset as u64 + (file_index * entry_lenght) as u64,
+                u64::from(sir0_data_offset) + u64::from(file_index * entry_lenght),
             ))?;
             let filename_offset_or_hash = sir0_file.read_u32::<LE>()?;
             let data_offset = sir0_file.read_u32::<LE>()?;
@@ -140,7 +140,7 @@ impl<F: Read + Seek> Farc<F> {
 
             match sir0_fat5_type {
                 0 => {
-                    sir0_file.seek(SeekFrom::Start(filename_offset_or_hash as u64))?;
+                    sir0_file.seek(SeekFrom::Start(u64::from(filename_offset_or_hash)))?;
                     let name = read_null_terminated_utf16_string(&mut sir0_file)?;
                     index.add_file_with_name(name, data_start, data_length)?;
                 }
@@ -153,16 +153,19 @@ impl<F: Read + Seek> Farc<F> {
     }
 
     /// return the number of file contained in this ``Farc`` file
+    #[must_use]
     pub fn file_count(&self) -> usize {
         self.index.len()
     }
 
     /// return the number of file with an unknown name in this ``Farc`` file
+    #[must_use]
     pub fn file_unknown_name(&self) -> usize {
         self.index.iter().filter(|f| f.name.is_none()).count()
     }
 
     /// return the number of file with a known name in this ``Farc`` file
+    #[must_use]
     pub fn file_known_name(&self) -> usize {
         self.index.iter().filter(|f| f.name.is_some()).count()
     }
@@ -217,8 +220,8 @@ impl<F: Read + Seek> Farc<F> {
     ) -> Result<PartitionMutex<F>, FarcError> {
         PartitionMutex::new(
             self.file.clone(),
-            file_data.start as u64,
-            file_data.length as u64,
+            u64::from(file_data.start),
+            u64::from(file_data.length),
         )
         .map_err(FarcError::PartitionCreationError)
     }

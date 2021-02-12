@@ -38,7 +38,7 @@ pub struct FarcWriter {
 impl FarcWriter {
     /// Create a new [`FarcWriter`] from an extracted [`Farc`] file
     pub fn new_from_farc<FT: Read + Seek>(farc: &Farc<FT>) -> Result<Self, FarcWriterError> {
-        let mut farc_writer = FarcWriter::default();
+        let mut farc_writer = Self::default();
 
         for file_hash in farc.iter_all_hash() {
             let mut file = farc.get_hashed_file(*file_hash)?;
@@ -67,7 +67,7 @@ impl FarcWriter {
         meta_file.write_all(&[0; 4])?; // 0x10 padding
         let mut meta_pointer = vec![4, 8];
 
-        for (file_hash, file_content) in hash_sorted.into_iter() {
+        for (file_hash, file_content) in hash_sorted {
             let file_start = storage_file.position();
             let file_lenght = file_content.len();
             storage_file.write_all(file_content)?;
