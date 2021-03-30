@@ -1,6 +1,6 @@
 [package]
 name = "pmd_farc"
-version = "1.0.0"
+version = "1.0.1"
 authors = ["marius851000 <mariusdavid@laposte.net>"]
 edition = "2018"
 description = "a library permitting to read FARC file, used in pokemon mystery dungeon on 3DS"
