@@ -47,6 +47,9 @@ pub enum FarcError {
     /// a conflict between two file entry
     #[error("A conflict between two file happened")]
     FileNameError(#[from] FileNameError),
+    /// A sub-file doesn't start at an offset that is a multiple of 16. FARC seem to require this.
+    #[error("A sub-file doesn't seem to start at an offset that is a multiple of 16. FARC seem to require this.")]
+    FileStartBadAlignement,
 }
 
 fn read_null_terminated_utf16_string<T: Read>(file: &mut T) -> Result<String, FarcError> {
@@ -137,6 +140,10 @@ impl<F: Read + Seek> Farc<F> {
                     },
                     Ok,
                 )?;
+            
+            if data_start % 16 != 0 {
+                return Err(FarcError::FileStartBadAlignement);
+            };
 
             match sir0_fat5_type {
                 0 => {

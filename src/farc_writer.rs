@@ -69,11 +69,20 @@ impl FarcWriter {
 
         for (file_hash, file_content) in hash_sorted {
             let file_start = storage_file.position();
-            let file_lenght = file_content.len();
+            let mut file_lenght = file_content.len();
             storage_file.write_all(file_content)?;
-            if storage_file.position() % 16 != 0 {
-                storage_file.write_all(&vec![0; storage_file.position() as usize % 16])?;
+
+            let position = storage_file.position();
+            // this padding, althougt being added by the farc file format, seem to be counted in the file lenght.
+            //TODO: check this on reading too
+            let padding_lenght = if position % 16 == 0 {
+                16
+            } else {
+                16 - storage_file.position() as usize % 16
             };
+            storage_file.write_all(&vec![0; padding_lenght])?;
+            file_lenght += padding_lenght;
+
             meta_file.write_u32::<LE>(*file_hash)?;
             //TODO: check transformation, resulting in error for too big file
             meta_file.write_u32::<LE>(file_start.try_into()?)?;
@@ -120,10 +129,10 @@ impl FarcWriter {
         let storage_start = no_padding_storage_start + padding_size_storage_start;
 
         file.write_all(b"FARC")?; //0x0, magic
-        file.write_u32::<LE>(0)?; //0x4, unknown
-        file.write_u32::<LE>(0)?; //0x8, idem
+        file.write_u32::<LE>(13434880)?; //0x4, unknown
+        file.write_u32::<LE>(4848240)?; //0x8, idem
         file.write_u32::<LE>(2)?; //0xC, idem
-        file.write_u32::<LE>(0)?; //0x10, idem
+        file.write_u32::<LE>(3670016)?; //0x10, idem
         file.write_u32::<LE>(0)?; //0x14, idem
         file.write_u32::<LE>(7)?; //0x18, idem
         file.write_all(&[0xA4, 0x3C, 0xEA, 0x77])?; //0x1C, idem
